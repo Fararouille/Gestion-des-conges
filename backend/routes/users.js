@@ -4,13 +4,35 @@ const bcrypt = require('bcryptjs');
 const User = require('../models/User');
 const { protect, rhOnly } = require('../middleware/auth');
 
-// GET /api/users - list all users (RH only)
+// GET /api/users - list all users (RH only) with pagination and search
 router.get('/', protect, rhOnly, async (req, res) => {
   try {
-    const users = await User.find()
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+    const { search } = req.query;
+
+    let query = {};
+    if (search && search.trim()) {
+      query = { email: { $regex: search.trim(), $options: 'i' } };
+    }
+
+    const total = await User.countDocuments(query);
+    const users = await User.find(query)
       .populate('manager', 'email role')
-      .sort({ createdAt: -1 });
-    res.json(users);
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit);
+
+    res.json({
+      users,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    });
   } catch (error) {
     res.status(500).json({ message: 'Erreur serveur', error: error.message });
   }

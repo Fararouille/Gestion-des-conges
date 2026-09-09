@@ -48,36 +48,76 @@ async function hasOverlap(userId, dateDebut, dateFin, excludeId) {
   return overlap !== null;
 }
 
-// GET /api/demandes — list demandes based on role
+// GET /api/demandes — list demandes based on role, with pagination, search and sort
 router.get('/', protect, async (req, res) => {
   try {
-    let query = {};
-    let demandes;
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+    const { statut, type, search, sort } = req.query;
+
+    let baseQuery = {};
+    let finalUserFilter = null;
 
     if (req.user.role === 'rh') {
-      // RH sees all
-      demandes = await Demande.find()
-        .populate('user', 'email role manager')
-        .populate('traitePar', 'email role')
-        .sort({ createdAt: -1 });
+      finalUserFilter = {};
     } else if (req.user.role === 'manager') {
-      // Manager sees team demandes
       const teamMembers = await User.find({ manager: req.user._id }).select('_id');
       const teamIds = teamMembers.map((m) => m._id);
-      teamIds.push(req.user._id); // include own
-      demandes = await Demande.find({ user: { $in: teamIds } })
-        .populate('user', 'email role manager')
-        .populate('traitePar', 'email role')
-        .sort({ createdAt: -1 });
+      teamIds.push(req.user._id);
+      finalUserFilter = { user: { $in: teamIds } };
     } else {
-      // Employee sees own
-      demandes = await Demande.find({ user: req.user._id })
-        .populate('user', 'email role manager')
-        .populate('traitePar', 'email role')
-        .sort({ createdAt: -1 });
+      finalUserFilter = { user: req.user._id };
     }
 
-    res.json(demandes);
+    if (finalUserFilter) baseQuery = { ...baseQuery, ...finalUserFilter };
+    if (statut) baseQuery.statut = statut;
+    if (type) baseQuery.type = type;
+
+    // Apply search on the matching users (by email) when provided
+    let searchUserIds = null;
+    if (search && search.trim()) {
+      const matchedUsers = await User.find({ email: { $regex: search.trim(), $options: 'i' } }).select('_id');
+      searchUserIds = matchedUsers.map((u) => u._id);
+    }
+
+    const countQuery = { ...baseQuery };
+    const sortField = sort || 'createdAt';
+    const sortDirection = sortField.startsWith('-') ? -1 : 1;
+    const cleanSortField = sortField.replace(/^-/, '');
+
+    // Count for pagination metadata (respecting search scope)
+    let total;
+    if (searchUserIds) {
+      const searchCountQuery = { ...baseQuery, user: { $in: searchUserIds } };
+      total = await Demande.countDocuments(searchCountQuery);
+    } else {
+      total = await Demande.countDocuments(countQuery);
+    }
+
+    let query;
+    if (searchUserIds) {
+      query = Demande.find({ ...baseQuery, user: { $in: searchUserIds } });
+    } else {
+      query = Demande.find(baseQuery);
+    }
+
+    const demandes = await query
+      .populate('user', 'email role manager')
+      .populate('traitePar', 'email role')
+      .sort({ [cleanSortField]: sortDirection })
+      .skip(skip)
+      .limit(limit);
+
+    res.json({
+      demandes,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    });
   } catch (error) {
     res.status(500).json({ message: 'Erreur serveur', error: error.message });
   }
