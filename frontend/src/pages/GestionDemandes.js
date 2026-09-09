@@ -1,11 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 
 function GestionDemandes() {
   const { user, api } = useAuth();
+  const { success, error } = useToast();
   const [demandes, setDemandes] = useState([]);
   const [filtered, setFiltered] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [pagination, setPagination] = useState({ page: 1, total: 0, totalPages: 1 });
   const [filters, setFilters] = useState({
     statut: 'tous',
     type: 'tous',
@@ -19,7 +23,11 @@ function GestionDemandes() {
 
   useEffect(() => {
     fetchDemandes();
-  }, []);
+  }, [page]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [filters]);
 
   useEffect(() => {
     let result = [...demandes];
@@ -43,9 +51,13 @@ function GestionDemandes() {
 
   const fetchDemandes = async () => {
     try {
-      const res = await api.get('/demandes');
-      setDemandes(res.data);
-      setFiltered(res.data);
+      const params = { page, limit: 10 };
+      if (filters.statut !== 'tous') params.statut = filters.statut;
+      if (filters.type !== 'tous') params.type = filters.type;
+      const res = await api.get('/demandes', { params });
+      setDemandes(res.data.demandes);
+      setFiltered(res.data.demandes);
+      setPagination(res.data.pagination);
     } catch (error) {
       console.error('Erreur chargement demandes:', error);
     } finally {
@@ -58,9 +70,10 @@ function GestionDemandes() {
     setProcessing(id);
     try {
       await api.put(`/demandes/${id}/valider`);
+      success('Demande validee avec succes');
       fetchDemandes();
-    } catch (error) {
-      alert(error.response?.data?.message || 'Erreur lors de la validation');
+    } catch (err) {
+      error(err.response?.data?.message || 'Erreur lors de la validation');
     } finally {
       setProcessing(null);
     }
@@ -68,7 +81,7 @@ function GestionDemandes() {
 
   const handleRefuser = async () => {
     if (!motifRefus.trim()) {
-      alert('Veuillez indiquer un motif de refus');
+      error('Veuillez indiquer un motif de refus');
       return;
     }
     setProcessing(refusModal);
@@ -76,9 +89,10 @@ function GestionDemandes() {
       await api.put(`/demandes/${refusModal}/refuse`, { motifRefus });
       setRefusModal(null);
       setMotifRefus('');
+      success('Demande refusee');
       fetchDemandes();
-    } catch (error) {
-      alert(error.response?.data?.message || 'Erreur lors du refus');
+    } catch (err) {
+      error(err.response?.data?.message || 'Erreur lors du refus');
     } finally {
       setProcessing(null);
     }
@@ -87,9 +101,10 @@ function GestionDemandes() {
   const handleModifierStatut = async (id, newStatut) => {
     try {
       await api.put(`/demandes/${id}/modifier-statut`, { statut: newStatut });
+      success('Statut mis a jour');
       fetchDemandes();
-    } catch (error) {
-      alert(error.response?.data?.message || 'Erreur lors de la modification');
+    } catch (err) {
+      error(err.response?.data?.message || 'Erreur lors de la modification');
     }
   };
 
@@ -225,6 +240,28 @@ function GestionDemandes() {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {pagination.totalPages > 1 && (
+        <div className="pagination">
+          <button
+            className="btn-secondary btn-small"
+            disabled={page <= 1}
+            onClick={() => setPage(page - 1)}
+          >
+            &laquo; Precedent
+          </button>
+          <span className="pagination-info">
+            Page {page} / {pagination.totalPages} ({pagination.total} demandes)
+          </span>
+          <button
+            className="btn-secondary btn-small"
+            disabled={page >= pagination.totalPages}
+            onClick={() => setPage(page + 1)}
+          >
+            Suivant &raquo;
+          </button>
         </div>
       )}
 

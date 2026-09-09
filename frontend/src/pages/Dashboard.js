@@ -11,8 +11,8 @@ function Dashboard() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const res = await api.get('/demandes');
-        const demandes = res.data;
+        const res = await api.get('/demandes?limit=100');
+        const demandes = res.data.demandes;
 
         setStats({
           total: demandes.length,

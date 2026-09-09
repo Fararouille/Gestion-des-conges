@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 
 function MesDemandes() {
   const { api } = useAuth();
+  const { success, error } = useToast();
   const [demandes, setDemandes] = useState([]);
   const [filtered, setFiltered] = useState([]);
   const [filterStatut, setFilterStatut] = useState('tous');
@@ -24,9 +26,9 @@ function MesDemandes() {
 
   const fetchDemandes = async () => {
     try {
-      const res = await api.get('/demandes');
-      setDemandes(res.data);
-      setFiltered(res.data);
+      const res = await api.get('/demandes?limit=200');
+      setDemandes(res.data.demandes);
+      setFiltered(res.data.demandes);
     } catch (error) {
       console.error('Erreur chargement demandes:', error);
     } finally {
@@ -39,10 +41,11 @@ function MesDemandes() {
     setAnnulating(id);
     try {
       await api.put(`/demandes/${id}/annuler`);
+      success('Demande annulee');
       fetchDemandes();
       setSelectedDemande(null);
-    } catch (error) {
-      alert(error.response?.data?.message || 'Erreur lors de l\'annulation');
+    } catch (err) {
+      error(err.response?.data?.message || 'Erreur lors de l\'annulation');
     } finally {
       setAnnulating(null);
     }

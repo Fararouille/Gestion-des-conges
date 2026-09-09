@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 
 function GestionUtilisateurs() {
   const { api } = useAuth();
+  const { success, error } = useToast();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -25,8 +27,8 @@ function GestionUtilisateurs() {
 
   const fetchUsers = async () => {
     try {
-      const res = await api.get('/users');
-      setUsers(res.data);
+      const res = await api.get('/users?limit=200');
+      setUsers(res.data.users);
     } catch (error) {
       console.error('Erreur chargement utilisateurs:', error);
     } finally {
@@ -76,9 +78,11 @@ function GestionUtilisateurs() {
         });
       }
       resetForm();
+      success(editingUser ? 'Utilisateur modifie avec succes' : 'Utilisateur cree avec succes');
       fetchUsers();
     } catch (err) {
       setFormError(err.response?.data?.message || 'Erreur');
+      error(err.response?.data?.message || 'Erreur');
     } finally {
       setFormLoading(false);
     }
@@ -102,18 +106,20 @@ function GestionUtilisateurs() {
       setResetModal(null);
       setResetPassword('');
       setResetError('');
-      alert('Mot de passe modifie avec succes');
-    } catch (error) {
-      setResetError(error.response?.data?.message || 'Erreur');
+      success('Mot de passe modifie avec succes');
+    } catch (err) {
+      setResetError(err.response?.data?.message || 'Erreur');
+      error(err.response?.data?.message || 'Erreur');
     }
   };
 
   const handleToggleActive = async (userId) => {
     try {
-      await api.put(`/users/${userId}/toggle-active`);
+      const res = await api.put(`/users/${userId}/toggle-active`);
+      success(res.data.message || 'Statut du compte mis a jour');
       fetchUsers();
-    } catch (error) {
-      alert(error.response?.data?.message || 'Erreur');
+    } catch (err) {
+      error(err.response?.data?.message || 'Erreur');
     }
   };
 
