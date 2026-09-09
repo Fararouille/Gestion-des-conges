@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 
 // Calculate business days between two dates (excluding weekends)
 function calculerJoursOuvrables(dateDebut, dateFin) {
@@ -21,6 +22,7 @@ function calculerJoursOuvrables(dateDebut, dateFin) {
 
 function NouvelleDemande() {
   const { user, api } = useAuth();
+  const { success } = useToast();
   const navigate = useNavigate();
 
   const [type, setType] = useState('CP');
@@ -72,6 +74,7 @@ function NouvelleDemande() {
       formData.append('commentaire', commentaire);
       if (justificatif) formData.append('justificatif', justificatif);
       await api.post('/demandes', formData);
+      success('Demande envoyee avec succes');
       navigate('/mes-demandes');
     } catch (err) {
       setError(err.response?.data?.message || 'Erreur lors de la creation de la demande');
