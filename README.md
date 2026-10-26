@@ -1,4 +1,4 @@
-# FINT2 - Gestion des conges
+Gestion des conges
 
 Application web pour gerer les conges a SUP Herman. Un employe envoie une demande, son manager la valide ou la refuse, et le service RH garde une vue d'ensemble sur les equipes et le calendrier.
 
